@@ -9,43 +9,138 @@
 // I don't really know how it will change.
 package logr
 
+import "fmt"
+
 // TODO: consider structured logging, a la uber-go/zap
 // TODO: consider other bits of glog functionality like Flush, InfoDepth, OutputStats
 
 // InfoLogger represents the ability to log non-error messages.
 type InfoLogger interface {
-	// Info logs a non-error message.  This is behaviorally akin to fmt.Print.
-	Info(args ...interface{})
-
-	// Infof logs a formatted non-error message.
-	Infof(format string, args ...interface{})
-
-	// Enabled test whether this InfoLogger is enabled.  For example,
-	// commandline flags might be used to set the logging verbosity and disable
-	// some info logs.
-	Enabled() bool
+	LogInfo(level int, fields map[string]interface{}, msg string)
 }
 
-// Logger represents the ability to log messages, both errors and not.
-type Logger interface {
-	// All Loggers implement InfoLogger.  Calling InfoLogger methods directly on
-	// a Logger value is equivalent to calling them on a V(0) InfoLogger.  For
-	// example, logger.Info() produces the same result as logger.V(0).Info.
-	InfoLogger
+// ErrorLogger represents the ability to log error messages.
+type ErrorLogger interface {
+	LogError(fields map[string]interface{}, msg string)
+}
 
-	// Error logs a error message.  This is behaviorally akin to fmt.Print.
-	Error(args ...interface{})
+// Info logs non-error messages.
+type Info struct {
+	logger InfoLogger
+	level  int
+	fields map[string]interface{}
+	prefix string
+}
 
-	// Errorf logs a formatted error message.
-	Errorf(format string, args ...interface{})
+// NewInfo creates a new Info that logs to the given logger.
+func NewInfo(logger InfoLogger) *Info {
+	return &Info{logger: logger}
+}
 
-	// V returns an InfoLogger value for a specific verbosity level.  A higher
-	// verbosity level means a log message is less important.
-	V(level int) InfoLogger
+// Info calls LogInfo to its logger.
+// Arguments are handled in the manner of fmt.Println.
+func (l *Info) Info(args ...interface{}) {
+	s := fmt.Sprintln(args...)
+	l.logger.LogInfo(l.level, l.fields, l.prefix+s[:len(s)-1])
+}
 
-	// NewWithPrefix returns a Logger which prefixes all messages.
-	NewWithPrefix(prefix string) Logger
+// Infof calls LogInfo to its logger.
+// Arguments are handled in the manner of fmt.Printf.
+func (l *Info) Infof(format string, args ...interface{}) {
+	l.logger.LogInfo(l.level, l.fields, l.prefix+fmt.Sprintf(format, args...))
+}
 
-	// WithField returns a logger with the given fields
-	WithField(name string, value interface{}) Logger
+// V returns a new log at the specific verbosity level.
+// A higher verbosity level means a log message is less important.
+func (l *Info) V(level int) *Info {
+	return &Info{
+		logger: l.logger,
+		fields: l.fields,
+		level:  level,
+		prefix: l.prefix,
+	}
+}
+
+// WithFields returns a new log with the given fields.
+func (l *Info) WithFields(fields map[string]interface{}) *Info {
+	f := make(map[string]interface{}, len(fields)+len(l.fields))
+	for k, v := range l.fields {
+		f[k] = v
+	}
+	for k, v := range fields {
+		f[k] = v
+	}
+	return &Info{
+		logger: l.logger,
+		fields: f,
+		level:  l.level,
+		prefix: l.prefix,
+	}
+}
+
+// WithPrefix returns a new log that prefixes all messages with a given string.
+func (l *Info) WithPrefix(prefix string) *Info {
+	return &Info{
+		logger: l.logger,
+		fields: l.fields,
+		level:  l.level,
+		prefix: l.prefix + prefix,
+	}
+}
+
+// Log logs both error and non-error messages.
+type Log struct {
+	info Info
+	err  ErrorLogger
+}
+
+// New creates a new log that sends output to the given loggers.
+func New(info InfoLogger, err ErrorLogger) *Log {
+	return &Log{info: Info{logger: info}, err: err}
+}
+
+// AsInfo returns the log as an info log.
+func (l *Log) AsInfo() *Info {
+	return &l.info
+}
+
+// Info calls LogInfo to its logger.
+// Arguments are handled in the manner of fmt.Println.
+func (l *Log) Info(args ...interface{}) {
+	l.info.Info(args...)
+}
+
+// Infof calls LogInfo to its logger.
+// Arguments are handled in the manner of fmt.Printf.
+func (l *Log) Infof(format string, args ...interface{}) {
+	l.info.Infof(format, args...)
+}
+
+// Error calls LogError to its logger.
+// Arguments are handled in the manner of fmt.Println.
+func (l *Log) Error(args ...interface{}) {
+	s := fmt.Sprintln(args...)
+	l.err.LogError(l.info.fields, l.info.prefix+s[:len(s)-1])
+}
+
+// Errorf calls LogError to its logger.
+// Arguments are handled in the manner of fmt.Printf.
+func (l *Log) Errorf(format string, args ...interface{}) {
+	l.err.LogError(l.info.fields, l.info.prefix+fmt.Sprintf(format, args...))
+}
+
+// V returns a new log at the specific verbosity level.
+// A higher verbosity level means a log message is less important.
+func (l *Log) V(level int) *Info {
+	return l.info.V(level)
+}
+
+// WithFields returns a new log with the given fields.
+func (l *Log) WithFields(fields map[string]interface{}) *Log {
+	return &Log{info: *l.info.WithFields(fields), err: l.err}
+}
+
+// WithPrefix returns a new log that prefixes all messages with a given string.
+func (l *Log) WithPrefix(prefix string) *Log {
+	return &Log{info: *l.info.WithPrefix(prefix), err: l.err}
 }
