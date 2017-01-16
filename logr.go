@@ -45,4 +45,7 @@ type Logger interface {
 
 	// NewWithPrefix returns a Logger which prefixes all messages.
 	NewWithPrefix(prefix string) Logger
+
+	// WithField returns a logger with the given fields
+	WithField(name string, value interface{}) Logger
 }

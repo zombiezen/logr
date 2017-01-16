@@ -1,6 +1,6 @@
 package testing
 
-import "github.com/thockin/logr"
+import "github.com/bketelsen/logr"
 
 // NullLogger is a logr.Logger that does nothing.
 type NullLogger struct{}
@@ -32,5 +32,9 @@ func (log NullLogger) V(_ int) logr.InfoLogger {
 }
 
 func (log NullLogger) NewWithPrefix(_ string) logr.Logger {
+	return log
+}
+
+func (log NullLogger) WithField(_ string, _ interface{}) logr.Logger {
 	return log
 }

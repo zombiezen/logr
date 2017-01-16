@@ -3,7 +3,7 @@ package testing
 import (
 	"testing"
 
-	"github.com/thockin/logr"
+	"github.com/bketelsen/logr"
 )
 
 // TestLogger is a logr.Logger that prints through a testing.T object.
@@ -39,5 +39,9 @@ func (log TestLogger) V(v int) logr.InfoLogger {
 }
 
 func (log TestLogger) NewWithPrefix(_ string) logr.Logger {
+	return log
+}
+
+func (log TestLogger) WithField(_ string, value interface{}) logr.Logger {
 	return log
 }
